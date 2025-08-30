@@ -1,13 +1,35 @@
 from psycopg2.extensions import connection
 from ..models import schemas
+from .cache import cache
+
+HYMNS_CACHE_KEY = "all_hymns"
+HYMN_DETAIL_CACHE_KEY_PREFIX = "hymn_detail_"
+
+def invalidate_hymn_cache():
+    cache.delete(HYMNS_CACHE_KEY)
+    # Invalidate all individual hymn caches (more complex, might need a set of hymn IDs)
+    # For simplicity, we'll just delete the main list cache for now.
 
 def get_hymns(db: connection):
+    cached_hymns = cache.get(HYMNS_CACHE_KEY)
+    if cached_hymns:
+        print("Returning hymns from cache.")
+        return [schemas.Hymn(**h) for h in cached_hymns]
+
     with db.cursor() as cursor:
         cursor.execute("SELECT id, hymn_number, title, category_id FROM hymns")
         hymns = cursor.fetchall()
-        return [schemas.Hymn(id=h[0], hymn_number=h[1], title=h[2], category_id=h[3]) for h in hymns]
+        hymn_list = [schemas.Hymn(id=h[0], hymn_number=h[1], title=h[2], category_id=h[3]) for h in hymns]
+        cache.set(HYMNS_CACHE_KEY, [h.dict() for h in hymn_list], ex=3600) # Cache for 1 hour
+        return hymn_list
 
 def get_hymn(db: connection, hymn_id: int):
+    cache_key = f"{HYMN_DETAIL_CACHE_KEY_PREFIX}{hymn_id}"
+    cached_hymn = cache.get(cache_key)
+    if cached_hymn:
+        print(f"Returning hymn {hymn_id} from cache.")
+        return schemas.Hymn(**cached_hymn)
+
     with db.cursor() as cursor:
         cursor.execute("SELECT id, hymn_number, title, category_id FROM hymns WHERE id = %s", (hymn_id,))
         hymn = cursor.fetchone()
@@ -25,6 +47,7 @@ def get_hymn(db: connection, hymn_id: int):
                     content_model.lines.append(schemas.ContentLine(id=line[0], hymn_content_id=line[1], line_text=line[2], line_order=line[3]))
                 
                 hymn_model.content.append(content_model)
-
+            
+            cache.set(cache_key, hymn_model.dict(), ex=3600) # Cache for 1 hour
             return hymn_model
     return None
