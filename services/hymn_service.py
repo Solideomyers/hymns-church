@@ -1,53 +1,109 @@
-from psycopg2.extensions import connection
-from ..models import schemas
+from sqlalchemy.orm import Session, joinedload
+from ..models import schemas, tables
 from .cache import cache
+from ..core.exceptions import HymnNotFoundError, DatabaseError
 
 HYMNS_CACHE_KEY = "all_hymns"
 HYMN_DETAIL_CACHE_KEY_PREFIX = "hymn_detail_"
 
-def invalidate_hymn_cache():
+def invalidate_hymn_cache(hymn_id: int = None):
+    """
+    Invalidate hymn-related caches.
+    If hymn_id is provided, invalidates the cache for that specific hymn.
+    Always invalidates the cache for the list of all hymns.
+    """
     cache.delete(HYMNS_CACHE_KEY)
-    # Invalidate all individual hymn caches (more complex, might need a set of hymn IDs)
-    # For simplicity, we'll just delete the main list cache for now.
+    if hymn_id:
+        cache.delete(f"{HYMN_DETAIL_CACHE_KEY_PREFIX}{hymn_id}")
+    print(f"Cache invalidated for all hymns and hymn_id: {hymn_id}")
 
-def get_hymns(db: connection):
-    cached_hymns = cache.get(HYMNS_CACHE_KEY)
-    if cached_hymns:
+def get_hymns(db: Session):
+    """
+    Retrieves a list of all hymns from cache or database.
+    """
+    cached_hymns_data = cache.get(HYMNS_CACHE_KEY)
+    if cached_hymns_data:
         print("Returning hymns from cache.")
-        return [schemas.Hymn(**h) for h in cached_hymns]
+        return [schemas.Hymn.parse_obj(h) for h in cached_hymns_data]
 
-    with db.cursor() as cursor:
-        cursor.execute("SELECT id, hymn_number, title, category_id FROM hymns")
-        hymns = cursor.fetchall()
-        hymn_list = [schemas.Hymn(id=h[0], hymn_number=h[1], title=h[2], category_id=h[3]) for h in hymns]
-        cache.set(HYMNS_CACHE_KEY, [h.dict() for h in hymn_list], ex=3600) # Cache for 1 hour
-        return hymn_list
+    print("Fetching hymns from database.")
+    hymns = db.query(tables.Hymn).order_by(tables.Hymn.hymn_number).all()
+    
+    hymn_schemas = [schemas.Hymn.from_orm(h) for h in hymns]
+    cache.set(HYMNS_CACHE_KEY, [h.dict() for h in hymn_schemas], ex=3600)
+    return hymn_schemas
 
-def get_hymn(db: connection, hymn_id: int):
+def get_hymn(db: Session, hymn_id: int):
+    """
+    Retrieves a specific hymn by its ID, including its full content.
+    """
     cache_key = f"{HYMN_DETAIL_CACHE_KEY_PREFIX}{hymn_id}"
-    cached_hymn = cache.get(cache_key)
-    if cached_hymn:
+    cached_hymn_data = cache.get(cache_key)
+    if cached_hymn_data:
         print(f"Returning hymn {hymn_id} from cache.")
-        return schemas.Hymn(**cached_hymn)
+        return schemas.Hymn.parse_obj(cached_hymn_data)
 
-    with db.cursor() as cursor:
-        cursor.execute("SELECT id, hymn_number, title, category_id FROM hymns WHERE id = %s", (hymn_id,))
-        hymn = cursor.fetchone()
-        if hymn:
-            hymn_model = schemas.Hymn(id=hymn[0], hymn_number=hymn[1], title=hymn[2], category_id=hymn[3])
+    print(f"Fetching hymn {hymn_id} from database.")
+    hymn = (
+        db.query(tables.Hymn)
+        .options(joinedload(tables.Hymn.content).joinedload(tables.HymnContent.lines))
+        .filter(tables.Hymn.id == hymn_id)
+        .first()
+    )
 
-            cursor.execute("SELECT id, hymn_id, content_type, stanza_number, content_order FROM hymn_content WHERE hymn_id = %s ORDER BY content_order", (hymn_id,))
-            contents = cursor.fetchall()
-            for content in contents:
-                content_model = schemas.HymnContent(id=content[0], hymn_id=content[1], content_type=content[2], stanza_number=content[3], content_order=content[4])
+    if not hymn:
+        raise HymnNotFoundError(hymn_id=hymn_id)
 
-                cursor.execute("SELECT id, hymn_content_id, line_text, line_order FROM content_lines WHERE hymn_content_id = %s ORDER BY line_order", (content_model.id,))
-                lines = cursor.fetchall()
-                for line in lines:
-                    content_model.lines.append(schemas.ContentLine(id=line[0], hymn_content_id=line[1], line_text=line[2], line_order=line[3]))
-                
-                hymn_model.content.append(content_model)
-            
-            cache.set(cache_key, hymn_model.dict(), ex=3600) # Cache for 1 hour
-            return hymn_model
-    return None
+    hymn_schema = schemas.Hymn.from_orm(hymn)
+    cache.set(cache_key, hymn_schema.dict(), ex=3600)
+    return hymn_schema
+        
+
+def create_or_update_hymns_from_parsed_data(db: Session, hymns_data: list):
+    """
+    Creates or updates hymns in the database from parsed data.
+    This is more robust than the previous DELETE then INSERT logic.
+    """
+    try:
+        for hymn_data in hymns_data:
+            db_hymn = db.query(tables.Hymn).filter_by(hymn_number=hymn_data['numero']).first()
+
+            if db_hymn:
+                # Update existing hymn
+                db_hymn.title = hymn_data['titulo']
+                # Clear existing content to replace it
+                db_hymn.content.clear()
+                invalidate_hymn_cache(hymn_id=db_hymn.id)
+            else:
+                # Create new hymn
+                db_hymn = tables.Hymn(
+                    hymn_number=hymn_data['numero'],
+                    title=hymn_data['titulo']
+                )
+                db.add(db_hymn)
+
+            # Add new content
+            for i, content_item in enumerate(hymn_data['contenido']):
+                db_content = tables.HymnContent(
+                    hymn=db_hymn,
+                    content_type=content_item['tipo'],
+                    stanza_number=content_item.get('estrofa_num'),
+                    content_order=i
+                )
+                db.add(db_content)
+
+                for j, line_text in enumerate(content_item['texto']):
+                    db_line = tables.ContentLine(
+                        hymn_content=db_content,
+                        line_text=line_text,
+                        line_order=j
+                    )
+                    db.add(db_line)
+
+        db.commit()
+        print(f"Successfully created/updated data for {len(hymns_data)} hymns.")
+        invalidate_hymn_cache() # Invalidate the main list cache
+
+    except Exception as e:
+        db.rollback()
+        raise DatabaseError(detail=f"Failed to create or update hymns: {e}")
