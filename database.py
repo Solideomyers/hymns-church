@@ -1,48 +1,42 @@
-import psycopg2
-from psycopg2 import pool
 import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-from typing import Generator
+from .models.tables import Base
 
 load_dotenv()
 
-DB_CONFIG = {
-    "dbname": os.getenv("POSTGRES_DB"),
-    "user": os.getenv("POSTGRES_USER"),
-    "password": os.getenv("POSTGRES_PASSWORD"),
-    "host": os.getenv("POSTGRES_HOST", "localhost"),
-    "port": os.getenv("POSTGRES_PORT", "5432")
-}
+# Construct the database URL from environment variables
+DATABASE_URL = (
+    f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@"
+    f"{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/"
+    f"{os.getenv('POSTGRES_DB')}"
+)
 
-# Global variable for the connection pool
-db_pool = None
+engine = create_engine(DATABASE_URL)
 
-def initialize_db_pool():
-    global db_pool
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    """
+    FastAPI dependency to get a database session.
+    Yields a SQLAlchemy session and ensures it's closed after the request.
+    """
+    db = SessionLocal()
     try:
-        db_pool = pool.SimpleConnectionPool(
-            minconn=1, 
-            maxconn=10, 
-            **DB_CONFIG
-        )
-        print("Database connection pool initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing database connection pool: {e}")
-        raise
-
-def close_db_pool():
-    global db_pool
-    if db_pool:
-        db_pool.closeall()
-        print("Database connection pool closed.")
-
-def get_db() -> Generator[psycopg2.extensions.connection, None, None]:
-    conn = None
-    try:
-        if not db_pool:
-            raise Exception("Database pool not initialized.")
-        conn = db_pool.getconn()
-        yield conn
+        yield db
     finally:
-        if conn:
-            db_pool.putconn(conn)
+        db.close()
+
+def create_tables():
+    """
+    Create all tables in the database that are defined in the Base metadata.
+    This is typically run once at application startup.
+    """
+    try:
+        print("Creating database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("Database tables created successfully.")
+    except Exception as e:
+        print(f"Error creating database tables: {e}")
+        raise
