@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from .routers import hymns, categories, generator, extraction
-from .database import initialize_db_pool, close_db_pool
+from .database import create_tables
+from .core.exceptions import HimnarioGeneratorException, PdfProcessingError, DatabaseError, HymnNotFoundError
 
 app = FastAPI(
     title="Himnario Generator API",
@@ -8,13 +10,38 @@ app = FastAPI(
     version="1.0.0",
 )
 
-@app.on_event("startup")
-async def startup_event():
-    initialize_db_pool()
+# Exception Handlers
+@app.exception_handler(HimnarioGeneratorException)
+async def himnario_generator_exception_handler(request: Request, exc: HimnarioGeneratorException):
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"message": "An internal server error occurred", "detail": exc.detail},
+    )
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    close_db_pool()
+@app.exception_handler(PdfProcessingError)
+async def pdf_processing_error_handler(request: Request, exc: PdfProcessingError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"message": "Error processing PDF", "detail": exc.detail},
+    )
+
+@app.exception_handler(DatabaseError)
+async def database_error_handler(request: Request, exc: DatabaseError):
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"message": "A database error occurred", "detail": exc.detail},
+    )
+
+@app.exception_handler(HymnNotFoundError)
+async def hymn_not_found_error_handler(request: Request, exc: HymnNotFoundError):
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"message": "Hymn not found", "detail": exc.detail},
+    )
+
+@app.on_event("startup")
+def startup_event():
+    create_tables()
 
 app.include_router(hymns.router)
 app.include_router(categories.router)
