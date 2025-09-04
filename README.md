@@ -14,6 +14,9 @@ Este es el backend para el proyecto Himnario Generator. Es una API de FastAPI di
 - **Gestión de Himnos**: Endpoints para listar, ver, crear, actualizar y eliminar himnos.
 - **Gestión de Categorías**: Endpoints para gestionar las categorías de los himnos.
 - **Generación de Documentos**: Funcionalidad para generar documentos (e.g., `.docx`) a partir de los himnos almacenados.
+- **Acceso a Datos Moderno con SQLAlchemy**: Implementación de un ORM para interacciones con la base de datos más seguras, eficientes y legibles, resolviendo el problema N+1.
+- **Gestión de Migraciones con Alembic**: Sistema robusto para gestionar cambios en el esquema de la base de datos.
+- **Manejo de Errores Mejorado**: Implementación de excepciones personalizadas y manejadores globales para una gestión de errores consistente y clara.
 
 ## Instalación y Setup
 
@@ -59,14 +62,12 @@ Sigue estos pasos para configurar el entorno de desarrollo local.
       POPPLER_PATH="C:\path\to\poppler\bin" # Ajusta esta ruta
       ```
 
-5.  **Inicia los servicios (PostgreSQL y Redis):**
-    Puedes usar Docker para levantar estos servicios fácilmente.
+5.  **Ejecuta las migraciones de la base de datos con Alembic:**
+    Asegúrate de que tu base de datos PostgreSQL esté corriendo y que las credenciales en `.env` sean correctas.
     ```bash
-    docker-compose up -d
+    # Desde el directorio 'backend'
+    alembic upgrade head
     ```
-
-6.  **Ejecuta las migraciones de la base de datos (si aplica):**
-    *Actualmente, la base de datos se inicializa desde el código. Se añadirá un sistema de migración en el futuro.*
 
 ## Uso
 
@@ -85,6 +86,9 @@ La documentación interactiva de la API (Swagger UI) se encuentra en `http://127
 - **Iniciar la aplicación**: `uvicorn main:app --reload`
 - **Ejecutar tests**: `pytest`
 - **Congelar dependencias**: `pip freeze > requirements.txt`
+- **Generar nueva migración de Alembic**: `alembic revision --autogenerate -m "Descripción de la migración"`
+- **Aplicar migraciones de Alembic**: `alembic upgrade head`
+- **Ver estado de las migraciones de Alembic**: `alembic current`
 
 ## API Endpoints
 
