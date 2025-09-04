@@ -1,9 +1,13 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
-class Category(BaseModel):
-    id: int
+# Schema for creating a new category (input)
+class CategoryCreate(BaseModel):
     name: str
+
+# Schema for representing a category (output)
+class Category(CategoryCreate):
+    id: int
 
     class Config:
         orm_mode = True
@@ -37,3 +41,7 @@ class Hymn(BaseModel):
 
     class Config:
         orm_mode = True
+
+class GenerateDocxRequest(BaseModel):
+    hymn_ids: List[int]
+    file_name: str
