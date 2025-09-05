@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
 from sqlalchemy.orm import Session
-from ..models import schemas
-from ..services import category_service
-from ..database import get_db
+from models import schemas
+from services import category_service
+from database import get_db
 
 router = APIRouter(
     prefix="/categories",

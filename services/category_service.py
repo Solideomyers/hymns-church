@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-from ..models import schemas, tables
-from .cache import cache
-from .hymn_service import invalidate_hymn_cache
-from ..core.exceptions import HymnNotFoundError, CategoryNotFoundError, DatabaseError
+from models import schemas, tables
+from services.cache import cache
+from services.hymn_service import invalidate_hymn_cache
+from core.exceptions import HymnNotFoundError, CategoryNotFoundError, DatabaseError
 
 CATEGORIES_CACHE_KEY = "all_categories"
 

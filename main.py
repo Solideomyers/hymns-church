@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from .routers import hymns, categories, generator, extraction
-from .database import create_tables
-from .core.exceptions import HimnarioGeneratorException, PdfProcessingError, DatabaseError, HymnNotFoundError
+from routers import hymns, categories, generator, extraction, admin
+from database import create_tables
+from core.exceptions import HimnarioGeneratorException, PdfProcessingError, DatabaseError, HymnNotFoundError
 
 app = FastAPI(
     title="Himnario Generator API",
@@ -39,14 +39,27 @@ async def hymn_not_found_error_handler(request: Request, exc: HymnNotFoundError)
         content={"message": "Hymn not found", "detail": exc.detail},
     )
 
-@app.on_event("startup")
-def startup_event():
+
+# Usar el nuevo manejador de eventos lifespan
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_tables()
+    yield
+
+app = FastAPI(
+    title="Himnario Generator API",
+    description="API for extracting, managing, and generating hymnaries from PDF files.",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 app.include_router(hymns.router)
 app.include_router(categories.router)
 app.include_router(generator.router)
 app.include_router(extraction.router)
+app.include_router(admin.router)
 
 @app.get("/", tags=["Root"])
 def read_root():

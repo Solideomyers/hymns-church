@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from docx import Document
 from docx.shared import Inches
 
-from ..models.tables import Hymn, HymnContent, ContentLine
-from ..core.exceptions import HimnarioGeneratorException, DatabaseError, HymnNotFoundError
+from models.tables import Hymn, HymnContent, ContentLine
+from core.exceptions import HimnarioGeneratorException, DatabaseError, HymnNotFoundError
 
 # Add the parent directory of the modules to the Python path
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -18,7 +18,8 @@ async def generate_hymnary_docx(db: Session, hymn_ids: list[int], file_name: str
         # Fetch hymns from the database
         hymns = db.query(Hymn).filter(Hymn.id.in_(hymn_ids)).all()
         if not hymns:
-            raise HymnNotFoundError(detail="No hymns found for the given IDs.")
+            # Usar -1 como id inválido para indicar que no se encontró ningún himno
+            raise HymnNotFoundError(hymn_id=-1)
 
         document = Document()
         document.add_heading('Himnario Generado', level=1)

@@ -8,11 +8,11 @@ import pytesseract
 from pdfminer.high_level import extract_text
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..services import hymn_service
-from ..services import hymn_parser # Import the new parser module
-from ..services.cache import cache
-from ..core.exceptions import PdfProcessingError, DatabaseError
+from database import get_db
+from services import hymn_service
+from services import hymn_parser # Import the new parser module
+from services.cache import cache
+from core.exceptions import PdfProcessingError, DatabaseError
 
 # --- Configuration ---
 TESSERACT_CMD = os.getenv("TESSERACT_CMD", "tesseract")

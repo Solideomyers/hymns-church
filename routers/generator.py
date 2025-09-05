@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from ..services import generator_service
-from ..models import schemas
-from ..database import get_db
-from ..core.exceptions import HimnarioGeneratorException
+from services import generator_service
+from models import schemas
+from database import get_db
+from core.exceptions import HimnarioGeneratorException
 
 router = APIRouter(
     prefix="/generator",

@@ -1,12 +1,15 @@
+
 import pytest
 from fastapi.testclient import TestClient
 import sys
 import os
 
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# Add backend directory to sys.path if not present
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-from backend.main import app
+from main import app
 
 @pytest.fixture(scope="module")
 def client():

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, File, UploadFile, Depends
 from sqlalchemy.orm import Session
-from ..services import extraction_service
-from ..database import get_db
-from ..core.exceptions import PdfProcessingError
+from services import extraction_service
+from database import get_db
+from core.exceptions import PdfProcessingError
 
 router = APIRouter(
     prefix="/extraction",

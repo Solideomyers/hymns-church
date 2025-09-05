@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
-from ..models import schemas, tables
-from .cache import cache
-from ..core.exceptions import HymnNotFoundError, DatabaseError
+from models import schemas, tables
+from services.cache import cache
+from core.exceptions import HymnNotFoundError, DatabaseError
 
 HYMNS_CACHE_KEY = "all_hymns"
 HYMN_DETAIL_CACHE_KEY_PREFIX = "hymn_detail_"
