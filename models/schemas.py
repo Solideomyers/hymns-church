@@ -10,7 +10,7 @@ class Category(CategoryCreate):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ContentLine(BaseModel):
     id: int
@@ -19,7 +19,7 @@ class ContentLine(BaseModel):
     line_order: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class HymnContent(BaseModel):
     id: int
@@ -30,7 +30,7 @@ class HymnContent(BaseModel):
     lines: List[ContentLine] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Hymn(BaseModel):
     id: int
@@ -40,7 +40,7 @@ class Hymn(BaseModel):
     content: List[HymnContent] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class GenerateDocxRequest(BaseModel):
     hymn_ids: List[int]
